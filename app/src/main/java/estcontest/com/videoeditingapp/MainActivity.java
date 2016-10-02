@@ -23,6 +23,7 @@ import android.util.Log;
 import android.util.SparseIntArray;
 import android.view.MotionEvent;
 import android.view.Surface;
+import android.view.SurfaceView;
 import android.view.View;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
@@ -34,8 +35,10 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.ViewConfiguration;
 import android.widget.Button;
+import android.widget.SeekBar;
 import android.widget.Toast;
 import android.widget.ToggleButton;
+import android.widget.VideoView;
 
 import java.io.IOException;
 
@@ -68,12 +71,14 @@ public class MainActivity extends AppCompatActivity {
     //마우스 move로 일정범위 벗어나면 취소하기 위한 값
     private int mTouchSlop;
 
-    //long click을 위한 변수들
-    private boolean mHasPerformedLongPress;
-    private CheckForLongPress mPendingCheckForLongPress;
-    private Handler mHandler = null;
-
     Button touchButton;
+
+    //player test
+    final static String SAMPLE_VIDEO_URL = "http://clips.vorwaerts-gmbh.de/big_buck_bunny.mp4";
+
+    VideoView   videoView;
+    SeekBar     seekBar;
+    Handler     updateHandler = null;
 
     static int i=0;
 
@@ -105,15 +110,11 @@ public class MainActivity extends AppCompatActivity {
         DisplayMetrics metrics = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getMetrics(metrics);
         mScreenDentisy = metrics.densityDpi;
-
         mMediaRecorder = new MediaRecorder();
-
         mProjectionManager = (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
-
-        //handler for long press button
-        mHandler = new Handler();
-
         mTouchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
+
+        //Video
 
         touchButton.setOnTouchListener(new View.OnTouchListener() {
             @Override
@@ -123,7 +124,37 @@ public class MainActivity extends AppCompatActivity {
                     case MotionEvent.ACTION_DOWN:
                         Log.i("CLICK", "ACTION_DOWN");
                         //영상 play
+
                         //화면녹화 start / resume;
+                        if (ContextCompat.checkSelfPermission(MainActivity.this,
+                                Manifest.permission.WRITE_EXTERNAL_STORAGE) +
+                                ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO)
+                                != PackageManager.PERMISSION_GRANTED) {
+
+                            if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE) ||
+                                    ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, Manifest.permission.RECORD_AUDIO)) {
+                                mToggleButton.setChecked(false);
+                                Snackbar.make(findViewById(android.R.id.content),
+                                        R.string.label_permissions,
+                                        Snackbar.LENGTH_INDEFINITE).setAction("Enable", new View.OnClickListener() {
+                                    @Override
+                                    public void onClick(View view) {
+                                        ActivityCompat.requestPermissions(MainActivity.this,
+                                                new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.RECORD_AUDIO}, REQUEST_PERMISSIONS);
+                                    }
+                                }).show();
+                            } else {
+                                ActivityCompat.requestPermissions(MainActivity.this,
+                                        new String[]{
+                                                Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.RECORD_AUDIO},
+                                        REQUEST_PERMISSIONS);
+                            }
+                        } else {
+                            onScreenShare(view);
+                        }
+
+
+
                         break;
 
                     case MotionEvent.ACTION_MOVE:
@@ -138,6 +169,35 @@ public class MainActivity extends AppCompatActivity {
                         Log.i("CLICK", "ACTION_UP");
                         //영상 pause
                         //화면녹화 pause
+
+                        if (ContextCompat.checkSelfPermission(MainActivity.this,
+                                Manifest.permission.WRITE_EXTERNAL_STORAGE) +
+                                ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO)
+                                != PackageManager.PERMISSION_GRANTED) {
+
+                            if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE) ||
+                                    ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, Manifest.permission.RECORD_AUDIO)) {
+                                mToggleButton.setChecked(false);
+                                Snackbar.make(findViewById(android.R.id.content),
+                                        R.string.label_permissions,
+                                        Snackbar.LENGTH_INDEFINITE).setAction("Enable", new View.OnClickListener() {
+                                    @Override
+                                    public void onClick(View view) {
+                                        ActivityCompat.requestPermissions(MainActivity.this,
+                                                new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.RECORD_AUDIO}, REQUEST_PERMISSIONS);
+                                    }
+                                }).show();
+                            } else {
+                                ActivityCompat.requestPermissions(MainActivity.this,
+                                        new String[]{
+                                                Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.RECORD_AUDIO},
+                                        REQUEST_PERMISSIONS);
+                            }
+                        } else {
+                            offScreenShare(view);
+                        }
+
+
                         break;
 
                     default:
@@ -146,40 +206,6 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             }
         });
-
-        mToggleButton = (ToggleButton) findViewById(R.id.toggle);
-        mToggleButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (ContextCompat.checkSelfPermission(MainActivity.this,
-                        Manifest.permission.WRITE_EXTERNAL_STORAGE) +
-                        ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO)
-                        != PackageManager.PERMISSION_GRANTED) {
-
-                    if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE) ||
-                            ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this, Manifest.permission.RECORD_AUDIO)) {
-                        mToggleButton.setChecked(false);
-                        Snackbar.make(findViewById(android.R.id.content),
-                                R.string.label_permissions,
-                                Snackbar.LENGTH_INDEFINITE).setAction("Enable", new View.OnClickListener() {
-                            @Override
-                            public void onClick(View view) {
-                                ActivityCompat.requestPermissions(MainActivity.this,
-                                        new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.RECORD_AUDIO}, REQUEST_PERMISSIONS);
-                            }
-                        }).show();
-                    } else {
-                        ActivityCompat.requestPermissions(MainActivity.this,
-                                new String[]{
-                                        Manifest.permission.WRITE_EXTERNAL_STORAGE, Manifest.permission.RECORD_AUDIO},
-                                REQUEST_PERMISSIONS);
-                    }
-                } else {
-                    onToggleScreenShare(view);
-                }
-            }
-        });
-
 
         if (currentApiVersion >= Build.VERSION_CODES.KITKAT) {
 
@@ -197,15 +223,6 @@ public class MainActivity extends AppCompatActivity {
             });
         }
 
-
-        FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
-                        .setAction("Action", null).show();
-            }
-        });
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
@@ -225,7 +242,6 @@ public class MainActivity extends AppCompatActivity {
 
         if (resultCode != RESULT_OK) {
             Toast.makeText(this, "Screen Cast Permission Denied", Toast.LENGTH_SHORT).show();
-            mToggleButton.setChecked(false);
             return;
         }
 
@@ -234,21 +250,28 @@ public class MainActivity extends AppCompatActivity {
         mMediaProjection.registerCallback(mMediaProjectionCallback, null);
         mVirtualDisplay = createVirtualDisplay();
         mMediaRecorder.start();
+
     }
 
-    public void onToggleScreenShare(View view) {
-        if (((ToggleButton) view).isChecked()) {
-            initRecorder();
-            shareShcreen();
-        } else {
-            mMediaRecorder.stop();
-            mMediaRecorder.reset();
-            Log.i(TAG, "Stopping Recording");
-            stopScreenSharing();
+    public void onScreenShare(View view){
+        initRecorder();
+        shareScreen();
+    }
+
+    public void offScreenShare(View view){
+        if(mMediaRecorder != null) {
+            try {
+                mMediaRecorder.stop();
+                mMediaRecorder.reset();
+            }catch(RuntimeException e){
+
+            }
         }
+        mMediaRecorder = null;
+        stopScreenSharing();
     }
 
-    private void shareShcreen() {
+    private void shareScreen() {
         if (mMediaProjection == null) {
             startActivityForResult(mProjectionManager.createScreenCaptureIntent(), REQUEST_CODE);
             return;
@@ -258,12 +281,29 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private VirtualDisplay createVirtualDisplay() {
+
+        if(mMediaRecorder.getSurface() == null){
+            Log.i(TAG, "getSurface() is null");
+        }
+
         return mMediaProjection.createVirtualDisplay("MainActivity",
                 DISPLAY_WIDTH, DISPLAY_HEIGHT, mScreenDentisy, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, mMediaRecorder.getSurface(), null, null);
+
+        //마지막에서 바로 앞 null : virtualdisplay.callback
+        //VirtualDisplay.callback
+        //onPaused(), 시스템이나 surface가 detached 되었을 경우 호출
+        //onResumed(), 시작되었을 경우
+        //onStopped(), 시스템에서 정지되었을 경우(완전 종료에 해당)
+        //마지막 null : handler handler;
     }
 
     private void initRecorder() {
         try {
+
+            if(mMediaRecorder == null){
+                mMediaRecorder = new MediaRecorder();
+            }
+
             mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
             mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
             mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
@@ -289,13 +329,17 @@ public class MainActivity extends AppCompatActivity {
     private class MediaProjectionCallback extends MediaProjection.Callback {
         @Override
         public void onStop() {
-            if (mToggleButton.isChecked()) {
-                mToggleButton.setChecked(false);
-                mMediaRecorder.stop();
+
+            if(mMediaRecorder != null) {
+                try {
+                    mMediaRecorder.stop();
+                }catch(RuntimeException e) {
+
+                }
                 mMediaRecorder.reset();
-                Log.i(TAG, "Recording Stopped");
             }
             mMediaProjection = null;
+
             stopScreenSharing();
         }
     }
@@ -349,61 +393,6 @@ public class MainActivity extends AppCompatActivity {
                             | View.SYSTEM_UI_FLAG_FULLSCREEN
                             | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
         }
-    }
-
-    /*@Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.main, menu);
-        return true;
-    }*/
-
-    class CheckForLongPress implements Runnable {
-
-        @Override
-        public void run() {
-            if (performLongCLick()) {
-                mHasPerformedLongPress = true;
-            }
-        }
-    }
-
-    private void postCheckForLongClick(int delayOffset) {
-        mHasPerformedLongPress = false;
-
-        if (mPendingCheckForLongPress == null) {
-            mPendingCheckForLongPress = new CheckForLongPress();
-
-        }
-
-        mHandler.postDelayed(mPendingCheckForLongPress,
-                ViewConfiguration.getLongPressTimeout() - delayOffset);
-
-        //여기서 시스템의 getLongPressTimeout()후에 message를 수행하게 함
-        //추가로 delay가 필요한 경우를 위해 파라미터로 조절할 수 있음.
-    }
-
-    /*
-    ** Remove the long press detection timer
-    ** 중간에 취소하기 위한 용도
-     */
-
-    private void removeLongPressCallback() {
-        if (mPendingCheckForLongPress != null) {
-            mHandler.removeCallbacks(mPendingCheckForLongPress);
-        }
-    }
-
-    public boolean performLongCLick() {
-        //실제 Long Chick을 처리하는 부분을 여기에 둠.
-        Log.i("CLICK", "Long Click OK");
-        Toast.makeText(MainActivity.this, "Long Click OK!!!", Toast.LENGTH_SHORT).show();
-        return true;
-    }
-
-    public void performOneClick(){
-        Log.i("CLICK", "One Click OK");
-        Toast.makeText(MainActivity.this, "One Click OK!!!", Toast.LENGTH_SHORT).show();
     }
 
 }

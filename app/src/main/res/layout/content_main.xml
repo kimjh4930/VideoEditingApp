@@ -10,7 +10,7 @@
     tools:context="estcontest.com.videoeditingapp.MainActivity"
     tools:showIn="@layout/app_bar_main">
 
-    <ToggleButton
+    <!--<ToggleButton
         android:text="ToggleButton"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -22,6 +22,14 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:id="@+id/button"
-        android:layout_weight="1" />
+        android:layout_weight="1" />-->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+    </LinearLayout>
 
 </LinearLayout>
